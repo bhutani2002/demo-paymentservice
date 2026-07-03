@@ -1,0 +1,33 @@
+{
+  "version": "1.0",
+  "last_updated": "2026-06-30",
+  "mined_patterns": [
+    {
+      "pattern_id": "MP-001",
+      "topic": "hardcoded_config_values",
+      "description": "Hardcoded parameters in business logic are consistently rejected during code review.",
+      "confidence": "HIGH",
+      "frequency": 3,
+      "source_prs": [1, 5, 12],
+      "status": "active"
+    },
+    {
+      "pattern_id": "MP-002",
+      "topic": "retry_max_attempts",
+      "description": "Standard retry limit of 3 is strictly enforced on all processor clients.",
+      "confidence": "HIGH",
+      "frequency": 2,
+      "source_prs": [3, 9],
+      "status": "active"
+    },
+    {
+      "pattern_id": "MP-003",
+      "topic": "singleton_pattern",
+      "description": "Proposed singleton implementations for class instances are rejected in favor of Dependency Injection.",
+      "confidence": "MEDIUM",
+      "frequency": 1,
+      "source_prs": [8],
+      "status": "archived"
+    }
+  ]
+}

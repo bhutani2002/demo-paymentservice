@@ -1,0 +1,96 @@
+{
+  "version": "1.0",
+  "last_updated": "2026-06-15",
+  "repo": "demo-paymentservice",
+  "decisions": [
+    {
+      "id": "TD-001",
+      "date": "2026-03-18",
+      "topic": "hardcoded_config_values",
+      "decision": "rejected",
+      "severity": "merge_blocker",
+      "description": "All configurable values must come from config.py or environment variables. Hardcoded values anywhere else are a merge blocker without exception.",
+      "rationale": "Had a production incident where timeout was hardcoded to 30s in one service and 60s in another, causing inconsistent behavior. Config.py is the single source of truth.",
+      "pr_reference": "PR #1",
+      "raised_by": "raag",
+      "relevant_files": ["src/config.py", "src/*.py"],
+      "keywords": ["hardcoded", "magic number", "literal value", "constant"],
+      "source": "json_bootstrap"
+    },
+    {
+      "id": "TD-002",
+      "date": "2026-04-02",
+      "topic": "retry_max_attempts",
+      "decision": "standardized",
+      "severity": "merge_blocker",
+      "description": "Maximum retry attempts is 3. This value must come from Config.RETRY_MAX_ATTEMPTS. Any PR setting a different value or hardcoding attempts is a merge blocker.",
+      "rationale": "Agreed after load testing showed 5 attempts caused thundering herd during outages. 3 with exponential backoff is the sweet spot for our SLAs.",
+      "pr_reference": "PR #3",
+      "raised_by": "raag",
+      "relevant_files": ["src/retry_handler.py"],
+      "keywords": ["retry", "attempts", "max_retries", "retry_count"],
+      "source": "json_bootstrap"
+    },
+    {
+      "id": "TD-003",
+      "date": "2026-05-14",
+      "topic": "singleton_pattern",
+      "decision": "rejected",
+      "severity": "suggestion",
+      "description": "Do not use singleton pattern for service classes. Use dependency injection instead.",
+      "rationale": "Singletons cause test isolation issues in our parallel pytest suite. DI allows proper mocking.",
+      "pr_reference": "PR #8",
+      "raised_by": "raag",
+      "relevant_files": ["src/*.py", "tests/*.py"],
+      "keywords": ["singleton", "global instance", "module-level instance"],
+      "source": "json_bootstrap"
+    },
+    {
+      "id": "TD-004",
+      "date": "2026-05-28",
+      "topic": "exception_handling_style",
+      "decision": "standardized",
+      "severity": "merge_blocker",
+      "description": "All service exceptions must be wrapped in ServiceException (or its subclasses) with error_code and user_message fields. Raw exceptions (ValueError, RuntimeError, etc.) must never propagate to callers.",
+      "rationale": "API consumers need consistent error shapes. Raw exceptions were leaking implementation details to clients.",
+      "pr_reference": "PR #11",
+      "raised_by": "raag",
+      "relevant_files": ["src/exceptions.py", "src/*.py"],
+      "keywords": [
+        "raise ValueError",
+        "raise RuntimeError",
+        "raise Exception",
+        "bare raise"
+      ],
+      "source": "json_bootstrap"
+    },
+    {
+      "id": "TD-005",
+      "date": "2026-06-10",
+      "topic": "circuit_breaker_bypass",
+      "decision": "rejected",
+      "severity": "merge_blocker",
+      "description": "The circuit breaker in PaymentProcessor must never be bypassed or removed. Any PR that removes the can_proceed() check or adds a flag to skip it is a merge blocker.",
+      "rationale": "Had a cascading failure when the circuit breaker was commented out during debugging and accidentally merged. Cost us 45 minutes of downtime.",
+      "pr_reference": "PR #18",
+      "raised_by": "raag",
+      "relevant_files": ["src/payment_processor.py"],
+      "keywords": ["circuit breaker", "can_proceed", "skip_circuit", "bypass"],
+      "source": "json_bootstrap"
+    },
+    {
+      "id": "TD-006",
+      "date": "2026-06-15",
+      "topic": "idempotency_cache_implementation",
+      "decision": "standardized",
+      "severity": "suggestion",
+      "description": "Idempotency cache TTL must come from Config.IDEMPOTENCY_CACHE_TTL_SECONDS. In-memory dict is acceptable for current scale. Redis migration planned for Q3.",
+      "rationale": "Current load is <100 req/s. In-memory is fine. But TTL must be configurable so we can tune without deploys.",
+      "pr_reference": "PR #21",
+      "raised_by": "raag",
+      "relevant_files": ["src/payment_processor.py"],
+      "keywords": ["idempotency", "cache", "ttl", "86400", "cache_ttl"],
+      "source": "json_bootstrap"
+    }
+  ]
+}
