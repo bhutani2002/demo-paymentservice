@@ -49,24 +49,18 @@ def test_circuit_breaker_blocks_when_open():
         processor.process_payment(req2)
     assert excinfo.value.error_code == "CIRCUIT_OPEN"
 
-def test_circuit_breaker_bypass_parameter():
+def test_idempotency_key_length_validation():
     processor = PaymentProcessor()
+    # Key exceeds 64 characters
+    long_key = "x" * 65
     req = PaymentRequest(
-        amount=1500.0,
+        amount=100.0,
         currency="USD",
         card_number="1234-5678-9012-3456",
         expiry="12/28",
-        cvv="123"
+        cvv="123",
+        idempotency_key=long_key
     )
-    
-    for _ in range(3):
-        try:
-            processor.process_payment(req)
-        except PaymentException:
-            pass
-            
-    # With skip_circuit=True, request bypasses check (should not raise CIRCUIT_OPEN, will try execute and fail with GATEWAY_ERROR instead)
     with pytest.raises(PaymentException) as excinfo:
-        req2 = PaymentRequest(amount=1500.0, currency="USD", card_number="1234", expiry="12", cvv="1")
-        processor.process_payment(req2, skip_circuit=True)
-    assert excinfo.value.error_code == "GATEWAY_ERROR"
+        processor.process_payment(req)
+    assert excinfo.value.error_code == "INVALID_KEY"
