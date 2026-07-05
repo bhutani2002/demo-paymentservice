@@ -3,6 +3,12 @@ name: ReviewGuard PR Verification
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Pull Request Number to verify'
+        required: true
+        default: '14'
 
 jobs:
   verify:
@@ -39,11 +45,12 @@ jobs:
 
       - name: Run ReviewGuard Agent
         env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
-          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+          PR_TITLE: ${{ github.event.pull_request.title || 'Manual verification run' }}
+          PR_BODY: ${{ github.event.pull_request.body || 'Manual trigger via workflow_dispatch' }}
           REPO_OWNER: ${{ github.repository_owner }}
           REPO_NAME: ${{ github.event.repository.name }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref || github.head_ref || 'main' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
