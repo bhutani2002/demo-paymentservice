@@ -1,29 +1,48 @@
+"""
+Core payment processing service — with idempotency key support.
+Implements Issue #15.
+"""
 import uuid
-import time
+import logging
+from datetime import datetime
+
 from src.config import Config
 from src.exceptions import PaymentException
 from src.models import PaymentRequest, PaymentResult
 from src.retry_handler import RetryHandler
 
 class CircuitBreaker:
-    """Mock circuit breaker to prevent cascading failures."""
     def __init__(self):
-        self.state = "CLOSED"
-        self.failures = 0
-        self.last_failure_time = 0
-        
+        self.failure_count: int = 0
+        self.threshold: int = Config.CIRCUIT_BREAKER_THRESHOLD
+        self.reset_timeout: int = Config.CIRCUIT_BREAKER_RESET_TIMEOUT
+        self.is_open: bool = False
+        self.opened_at: datetime | None = None
+
+    def record_failure(self) -> None:
+        self.failure_count += 1
+        if self.failure_count >= self.threshold:
+            self.is_open = True
+            self.opened_at = datetime.now()
+
+    def record_success(self) -> None:
+        self.failure_count = 0
+        self.is_open = False
+
     def can_proceed(self) -> bool:
-        if self.state == "OPEN":
-            # State transitions to HALF-OPEN after 10 seconds of cooldown
-            if time.time() - self.last_failure_time > 10:
-                self.state = "HALF-OPEN"
-                return True
-            return False
-        return True
+        if not self.is_open:
+            return True
+        elapsed = (datetime.now() - self.opened_at).seconds
+        if elapsed >= self.reset_timeout:
+            self.is_open = False
+            self.failure_count = 0
+            return True
+        return False
+
 
 class PaymentProcessor:
-    """Processes payment requests and manages idempotency and retries."""
     def __init__(self):
+        self.retry_handler = RetryHandler()
         self.circuit_breaker = CircuitBreaker()
         self._processed_cache = {}
         # Read idempotency TTL from Config (standardized)
