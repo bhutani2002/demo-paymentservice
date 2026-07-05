@@ -42,6 +42,7 @@ graph TD
 *   **`review-artifacts/`**: ReviewGuard integration folders:
     *   `memory/team-decisions.json`: Bootstrapped team coding decisions.
     *   `memory/pattern-history.json`: Mined guideline histories.
+    *   `YYYY-MM-DD/`: Generated PR verification audit logs (committed by ReviewGuard after each run).
 
 ---
 
