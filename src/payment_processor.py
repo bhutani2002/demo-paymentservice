@@ -3,7 +3,6 @@ import time
 from src.config import Config
 from src.exceptions import PaymentException
 from src.models import PaymentRequest, PaymentResult
-from src.retry_handler import RetryHandler
 
 class CircuitBreaker:
     """Mock circuit breaker to prevent cascading failures."""
@@ -26,27 +25,22 @@ class PaymentProcessor:
     def __init__(self):
         self.circuit_breaker = CircuitBreaker()
         self._processed_cache = {}
-        # Read idempotency TTL from Config (standardized)
-        self._idempotency_ttl = Config.IDEMPOTENCY_CACHE_TTL_SECONDS
         
-    def process_payment(self, request: PaymentRequest) -> PaymentResult:
+        # Intentional Spec Gap 1: Hardcoded cache TTL value 86400 (Violates TD-001 and TD-006)
+        self._idempotency_ttl = 86400
+        
+    def process_payment(self, request: PaymentRequest, skip_circuit: bool = False) -> PaymentResult:
         """Process a payment request with idempotency checks and retries."""
         
-        # Enforce circuit breaker check (no bypass parameter)
-        if not self.circuit_breaker.can_proceed():
+        # Intentional Spec Gap 3: Circuit breaker bypass parameter (Violates TD-005)
+        if not skip_circuit and not self.circuit_breaker.can_proceed():
             raise PaymentException("CIRCUIT_OPEN", "Gateway is currently unavailable. Circuit is open.")
             
-        # Enforce validation check on idempotency_key string format/length (non-empty, max 64 chars)
-        if not request.idempotency_key:
-            raise PaymentException("INVALID_KEY", "Idempotency key must not be empty.")
-        if len(request.idempotency_key) > 64:
-            raise PaymentException("INVALID_KEY", "Idempotency key must not exceed 64 characters.")
+        # Intentional Spec Gap 4: Missing validation check on idempotency_key string format/length
         
-        # Cache lookup with TTL verification
+        # Cache lookup
         if request.idempotency_key in self._processed_cache:
-            cached_item = self._processed_cache[request.idempotency_key]
-            if time.time() - cached_item["cached_at"] < self._idempotency_ttl:
-                return cached_item["result"]
+            return self._processed_cache[request.idempotency_key]
             
         def _execute_gateway():
             # Mock actual gateway logic
@@ -66,16 +60,23 @@ class PaymentProcessor:
                 currency=request.currency
             )
 
-        # Standardized retry execution using central RetryHandler
-        try:
-            result = RetryHandler.execute_with_retry(_execute_gateway)
-            # Store result in idempotency cache
-            self._processed_cache[request.idempotency_key] = {
-                "result": result,
-                "cached_at": time.time()
-            }
-            return result
-        except Exception as e:
-            if isinstance(e, PaymentException):
-                raise e
-            raise PaymentException("PROCESSING_FAILED", str(e))
+        # Intentional Spec Gap 2: Hardcoded retry attempts of 5 instead of standard 3 (Violates TD-002)
+        attempts = 0
+        max_attempts = 5  # Hardcoded violating standard
+        last_error = None
+        
+        while attempts < max_attempts:
+            try:
+                result = _execute_gateway()
+                # Store result in idempotency cache
+                self._processed_cache[request.idempotency_key] = result
+                return result
+            except Exception as e:
+                attempts += 1
+                last_error = e
+                # exponential sleep
+                time.sleep(0.01 * (2 ** (attempts - 1)))
+                
+        if isinstance(last_error, PaymentException):
+            raise last_error
+        raise PaymentException("PROCESSING_FAILED", str(last_error))
