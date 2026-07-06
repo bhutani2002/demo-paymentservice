@@ -22,6 +22,15 @@ class CircuitBreaker:
 
 class PaymentProcessor:
     """Processes payment requests and manages idempotency and retries."""
+    _instance = None
+
+    @classmethod
+    def get_instance(cls):
+        """Get the global singleton instance of PaymentProcessor."""
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
     def __init__(self):
         self.circuit_breaker = CircuitBreaker()
         self._processed_cache = {}
